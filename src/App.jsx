@@ -8,6 +8,7 @@ import RequireSellerRole from '@/components/RequireSellerRole'
 import ErpHome from '@/pages/ErpHome'
 import SellerPage from '@/pages/SellerPage'
 import SellerOrdersPage from '@/pages/SellerOrdersPage'
+import AccessDeniedPage from '@/pages/AccessDeniedPage'
 import WarehousePage from '@/pages/WarehousePage'
 import KeltirilganPage from '@/pages/KeltirilganPage'
 import KeltirilganMonthlyPage from '@/pages/KeltirilganMonthlyPage'
@@ -18,6 +19,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/403" element={<AccessDeniedPage />} />
       <Route
         path="/"
         element={

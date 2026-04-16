@@ -55,7 +55,6 @@ export default function SellerPage() {
   const [addingToCart, setAddingToCart] = useState(false)
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [cartClearing, setCartClearing] = useState(false)
-  const [lineBusy, setLineBusy] = useState({})
   const [customerName, setCustomerName] = useState('')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [mobileCartOpen, setMobileCartOpen] = useState(false)
@@ -146,52 +145,17 @@ export default function SellerPage() {
     })
   }
 
-  async function updateQty(id, delta) {
+  function updateQty(id, delta) {
     if (!id || !delta) return
-    const line = cart.find((x) => x.id === id)
-    if (!line) return
-    if (lineBusy[id]) return
-
-    setLineBusy((prev) => ({ ...prev, [id]: true }))
-    setError(null)
-    try {
-      if (delta > 0) {
-        const res = await recordRetailSale({
-          productId: line.productId,
-          colorRaw: line.colorRaw,
-          quantity: delta,
+    setCart((prev) =>
+      prev
+        .map((item) => {
+          if (item.id !== id) return item
+          const next = Math.max(0, item.qty + delta)
+          return next === 0 ? null : { ...item, qty: next }
         })
-        if (!res?.success) {
-          setError(res?.error || 'Ombordan ayirishda xato')
-          return
-        }
-      } else {
-        const res = await recordRetailRestock({
-          productId: line.productId,
-          colorRaw: line.colorRaw,
-          quantity: Math.abs(delta),
-        })
-        if (!res?.success) {
-          setError(res?.error || 'Omborga qaytarishda xato')
-          return
-        }
-      }
-
-      setCart((prev) =>
-        prev
-          .map((item) => {
-            if (item.id !== id) return item
-            const next = Math.max(0, item.qty + delta)
-            return next === 0 ? null : { ...item, qty: next }
-          })
-          .filter(Boolean)
-      )
-      await load()
-    } catch (e) {
-      setError(e?.message || String(e))
-    } finally {
-      setLineBusy((prev) => ({ ...prev, [id]: false }))
-    }
+        .filter(Boolean)
+    )
   }
 
   const subtotal = useMemo(() => {
@@ -222,7 +186,7 @@ export default function SellerPage() {
     setColorQtyDraft((prev) => ({ ...prev, [key]: capped > 0 ? String(capped) : '' }))
   }
 
-  async function addSelectedToCart() {
+  function addSelectedToCart() {
     if (!selectedProduct) return
     const p = selectedProduct
     const stockMap = p._colorStockMap || {}
@@ -251,60 +215,31 @@ export default function SellerPage() {
     }
 
     setAddingToCart(true)
-    try {
-      const successRows = []
-      const failed = []
+    setCart((prev) => {
+      const next = [...prev]
       for (const row of toAdd) {
-        const res = await recordRetailSale({
-          productId: p.id,
-          colorRaw: row.key === '__default__' ? null : row.key,
-          quantity: row.qty,
-        })
-        if (!res?.success) {
-          failed.push(`${row.label}: ${res?.error || 'xato'}`)
+        const lineId = `${p.id}::${row.key}`
+        const idx = next.findIndex((x) => x.id === lineId)
+        if (idx >= 0) {
+          next[idx] = { ...next[idx], qty: next[idx].qty + row.qty }
         } else {
-          successRows.push(row)
+          next.push({
+            id: lineId,
+            productId: p.id,
+            name: getProductDisplayName(p),
+            imageUrl: getProductImageUrl(p),
+            unitPrice: getProductUnitPrice(p),
+            categoryName: getProductDisplayCategory(p),
+            colorLabel: row.label,
+            colorRaw: row.key === '__default__' ? null : row.key,
+            qty: row.qty,
+          })
         }
       }
-
-      if (successRows.length) {
-        setCart((prev) => {
-          const next = [...prev]
-          for (const row of successRows) {
-            const lineId = `${p.id}::${row.key}`
-            const idx = next.findIndex((x) => x.id === lineId)
-            if (idx >= 0) {
-              next[idx] = { ...next[idx], qty: next[idx].qty + row.qty }
-            } else {
-              next.push({
-                id: lineId,
-                productId: p.id,
-                name: getProductDisplayName(p),
-                imageUrl: getProductImageUrl(p),
-                unitPrice: getProductUnitPrice(p),
-                categoryName: getProductDisplayCategory(p),
-                colorLabel: row.label,
-                colorRaw: row.key === '__default__' ? null : row.key,
-                qty: row.qty,
-              })
-            }
-          }
-          return next
-        })
-      }
-
-      await load()
-
-      if (failed.length) {
-        setModalError(`Ba'zi ranglar qo‘shilmadi:\n${failed.join('\n')}`)
-        return
-      }
-      closeProductModal()
-    } catch (e) {
-      setModalError(e?.message || String(e))
-    } finally {
-      setAddingToCart(false)
-    }
+      return next
+    })
+    closeProductModal()
+    setAddingToCart(false)
   }
 
   async function handleCheckout() {
@@ -312,7 +247,22 @@ export default function SellerPage() {
     setCheckoutLoading(true)
     setError(null)
     setNotice('')
+    const applied = []
     try {
+      // 1) Ombordan ayirish (buyurtma yakunida)
+      for (const line of cart) {
+        const res = await recordRetailSale({
+          productId: line.productId,
+          colorRaw: line.colorRaw,
+          quantity: line.qty,
+        })
+        if (!res?.success) {
+          throw new Error(`${line.name}: ${res?.error || 'Ombordan ayirishda xato'}`)
+        }
+        applied.push(line)
+      }
+
+      // 2) Buyurtmani saqlash
       const saved = await createSalesOrder({
         sellerUserId: user?.id || null,
         sellerEmail: user?.email || '',
@@ -329,7 +279,17 @@ export default function SellerPage() {
       setCustomerName('')
       setMobileCartOpen(false)
       setNotice(`To‘lov yakunlandi. Buyurtma: #${String(saved.orderId).slice(0, 8)}`)
+      await load()
     } catch (e) {
+      // 3) Agar saqlash yoki ayirishda xato bo'lsa, qo'llangan ayirishlarni qaytaramiz
+      for (let i = applied.length - 1; i >= 0; i -= 1) {
+        const line = applied[i]
+        await recordRetailRestock({
+          productId: line.productId,
+          colorRaw: line.colorRaw,
+          quantity: line.qty,
+        })
+      }
       setError(e?.message || String(e))
     } finally {
       setCheckoutLoading(false)
@@ -339,31 +299,9 @@ export default function SellerPage() {
   async function handleClearCart() {
     if (!cart.length || cartClearing) return
     setCartClearing(true)
-    setError(null)
-    try {
-      const errs = []
-      for (const line of cart) {
-        const res = await recordRetailRestock({
-          productId: line.productId,
-          colorRaw: line.colorRaw,
-          quantity: line.qty,
-        })
-        if (!res?.success) {
-          errs.push(`${line.name}: ${res?.error || 'xato'}`)
-        }
-      }
-      if (errs.length) {
-        setError(`Savatni tozalashda xatolar:\n${errs.join('\n')}`)
-      } else {
-        setCart([])
-        setNotice("Savat tozalandi va mahsulotlar omborga qaytarildi")
-      }
-      await load()
-    } catch (e) {
-      setError(e?.message || String(e))
-    } finally {
-      setCartClearing(false)
-    }
+    setCart([])
+    setNotice("Savat tozalandi")
+    setCartClearing(false)
   }
 
   if (!configured) {
@@ -631,7 +569,6 @@ export default function SellerPage() {
                         type="button"
                         className="qty-btn"
                         onClick={() => updateQty(item.id, -1)}
-                        disabled={Boolean(lineBusy[item.id])}
                       >
                         <Minus size={14} />
                       </button>
@@ -640,7 +577,6 @@ export default function SellerPage() {
                         type="button"
                         className="qty-btn"
                         onClick={() => updateQty(item.id, 1)}
-                        disabled={Boolean(lineBusy[item.id])}
                       >
                         <Plus size={14} />
                       </button>

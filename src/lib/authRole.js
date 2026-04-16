@@ -80,7 +80,7 @@ export async function resolveNuurRole(user) {
 export function defaultPathForRole(role) {
   if (role === 'erp' || role === 'admin') return '/'
   if (role === 'seller') return '/sotuvchi'
-  return '/login'
+  return '/403'
 }
 
 export function canAccessErp(role) {

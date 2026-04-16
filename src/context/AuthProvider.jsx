@@ -131,7 +131,7 @@ export function AuthProvider({ children }) {
     })
     if (error) throw error
     const u = data.user
-    let r = 'seller'
+    let r = 'user'
     try {
       const resolved = await resolveNuurRole(u)
       r = resolved !== null && resolved !== undefined ? resolved : 'user'
