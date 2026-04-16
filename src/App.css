@@ -3085,3 +3085,60 @@ body {
   background: var(--primary);
   border-radius: 4px;
 }
+
+/* ERP inbound realtime toast */
+.erp-inbound-toast {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 1200;
+  width: min(420px, calc(100vw - 24px));
+  padding: 14px 14px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(193, 164, 97, 0.35);
+  background: #fffef9;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.18);
+}
+
+.erp-inbound-toast-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.erp-inbound-toast-body {
+  margin-top: 4px;
+  font-size: 0.87rem;
+  color: var(--text-muted);
+}
+
+.erp-inbound-toast-actions {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.erp-inbound-toast-btn {
+  border: none;
+  border-radius: 9px;
+  padding: 8px 12px;
+  font-size: 0.83rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: #fff;
+  background: var(--primary);
+}
+
+.erp-inbound-toast-btn-ghost {
+  color: var(--text);
+  background: #eceae2;
+}
+
+@media (max-width: 700px) {
+  .erp-inbound-toast {
+    right: 12px;
+    bottom: 12px;
+    width: calc(100vw - 24px);
+  }
+}

@@ -130,9 +130,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="login-footer">
-          © 2024 Nuur Home ERP · Versiya 2.0.0
-        </p>
+        <p className="login-footer">Nuur Home ERP · Versiya 2.0.0</p>
       </div>
     </div>
   )
