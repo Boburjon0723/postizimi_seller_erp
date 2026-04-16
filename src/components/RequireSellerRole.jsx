@@ -1,8 +1,8 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '@/context/auth-context'
-import { canAccessErp } from '@/lib/authRole'
+import { canAccessSeller } from '@/lib/authRole'
 
-export default function RequireErpRole({ children }) {
+export default function RequireSellerRole({ children }) {
   const { role, loading } = useAuth()
 
   if (loading) {
@@ -13,8 +13,8 @@ export default function RequireErpRole({ children }) {
     )
   }
 
-  if (!canAccessErp(role)) {
-    return <Navigate to="/sotuvchi" replace />
+  if (!canAccessSeller(role)) {
+    return <Navigate to="/" replace />
   }
 
   return children

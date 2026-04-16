@@ -1,15 +1,21 @@
 import { supabase } from '@/lib/supabase'
 
-/** @typedef {'seller' | 'erp'} NuurRole */
+/** @typedef {'user' | 'seller' | 'erp' | 'crm' | 'admin'} NuurRole */
 const ROLE_TIMEOUT_MS = 8000
 
 function normalizeRole(value) {
   const s = String(value || '').trim().toLowerCase()
-  if (s === 'erp' || s === 'admin' || s === 'manager' || s === 'ceo') {
+  if (s === 'admin' || s === 'owner' || s === 'superadmin') {
+    return 'admin'
+  }
+  if (s === 'erp' || s === 'manager' || s === 'ceo') {
     return 'erp'
   }
+  if (s === 'crm') {
+    return 'crm'
+  }
   if (s === 'seller' || s === 'sotuvchi' || s === 'pos' || s === 'user') {
-    return 'seller'
+    return s === 'user' ? 'user' : 'seller'
   }
   return null
 }
@@ -72,5 +78,15 @@ export async function resolveNuurRole(user) {
 }
 
 export function defaultPathForRole(role) {
-  return role === 'erp' ? '/' : '/sotuvchi'
+  if (role === 'erp' || role === 'admin') return '/'
+  if (role === 'seller') return '/sotuvchi'
+  return '/login'
+}
+
+export function canAccessErp(role) {
+  return role === 'erp' || role === 'admin'
+}
+
+export function canAccessSeller(role) {
+  return role === 'seller' || role === 'admin'
 }

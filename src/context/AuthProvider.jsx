@@ -5,6 +5,7 @@ import { AuthContext } from '@/context/auth-context'
 
 /** getSession() uchun qisqa timeout brauzer lock bilan to‘qnashadi — faqat juda uzoq kutishga chek */
 const SESSION_HARD_TIMEOUT_MS = 45000
+const APP_ALLOWED_ROLES = new Set(['seller', 'erp', 'admin'])
 
 function withTimeout(promise, ms, message) {
   return Promise.race([
@@ -27,7 +28,7 @@ export function AuthProvider({ children }) {
       return
     }
     setRole((prev) => {
-      if (prev === null || prev === undefined) return 'seller'
+      if (prev === null || prev === undefined) return 'user'
       return prev
     })
   }
@@ -41,7 +42,7 @@ export function AuthProvider({ children }) {
       const r = await resolveNuurRole(u)
       applyResolvedRole(r)
     } catch {
-      setRole((prev) => (prev === null || prev === undefined ? 'seller' : prev))
+      setRole((prev) => (prev === null || prev === undefined ? 'user' : prev))
     }
   }, [])
 
@@ -133,9 +134,13 @@ export function AuthProvider({ children }) {
     let r = 'seller'
     try {
       const resolved = await resolveNuurRole(u)
-      r = resolved !== null && resolved !== undefined ? resolved : 'seller'
+      r = resolved !== null && resolved !== undefined ? resolved : 'user'
     } catch {
-      r = 'seller'
+      r = 'user'
+    }
+    if (!APP_ALLOWED_ROLES.has(r)) {
+      await supabase.auth.signOut()
+      throw new Error('Bu akkauntga ERP/POS kirish ruxsati berilmagan.')
     }
     setUser(u)
     setSession(data.session)

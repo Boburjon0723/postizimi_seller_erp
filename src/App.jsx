@@ -4,6 +4,7 @@ import RequireAuth from '@/components/RequireAuth'
 import Layout from '@/pages/Layout'
 import LoginPage from '@/pages/LoginPage'
 import RequireErpRole from '@/components/RequireErpRole'
+import RequireSellerRole from '@/components/RequireSellerRole'
 import ErpHome from '@/pages/ErpHome'
 import SellerPage from '@/pages/SellerPage'
 import SellerOrdersPage from '@/pages/SellerOrdersPage'
@@ -25,7 +26,14 @@ function AppRoutes() {
           </RequireAuth>
         }
       >
-        <Route index element={<ErpHome />} />
+        <Route
+          index
+          element={
+            <RequireErpRole>
+              <ErpHome />
+            </RequireErpRole>
+          }
+        />
         <Route
           path="ombor"
           element={
@@ -58,8 +66,22 @@ function AppRoutes() {
             </RequireErpRole>
           }
         />
-        <Route path="sotuvchi" element={<SellerPage />} />
-        <Route path="sotuvchi/buyurtmalar" element={<SellerOrdersPage />} />
+        <Route
+          path="sotuvchi"
+          element={
+            <RequireSellerRole>
+              <SellerPage />
+            </RequireSellerRole>
+          }
+        />
+        <Route
+          path="sotuvchi/buyurtmalar"
+          element={
+            <RequireSellerRole>
+              <SellerOrdersPage />
+            </RequireSellerRole>
+          }
+        />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
