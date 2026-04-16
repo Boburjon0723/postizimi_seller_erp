@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useLocation, useNavigate } from 'react-router-dom'
 import SellerNavDrawer from '@/components/SellerNavDrawer'
 import SellerMobileBottomNav from '@/components/SellerMobileBottomNav'
+import SkeletonCard from '@/components/SkeletonCard'
 import { useAuth } from '@/context/auth-context'
 import { formatErpUsdAllowZero } from '@/lib/formatErpUsd'
 import { isSupabaseConfigured } from '@/lib/supabase'
@@ -481,7 +483,7 @@ export default function SellerPage() {
 
         <div className="pos-cards pos-modern-grid">
           {loading ? (
-             <div className="erp-spinner" style={{ gridColumn: '1/-1', margin: '4rem auto' }} />
+             Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)
           ) : filtered.length === 0 ? (
             <div className="pos-empty-state">
               <Package size={48} />
@@ -494,7 +496,15 @@ export default function SellerPage() {
               const qty = Math.max(0, Number(p.stock) || 0)
               const sku = String(p.size || '').trim() || '—'
               return (
-                <article key={p.id} className="pos-card-modern" onClick={() => addToCart(p)}>
+                <motion.article 
+                  key={p.id} 
+                  className="pos-card-modern" 
+                  onClick={() => addToCart(p)}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  whileHover={{ y: -5 }}
+                  whileTap={{ scale: 0.98 }}
+                >
                   <div className="pos-card-img-box">
                     <span className="pos-card-art-badge">ART. {sku}</span>
                     {img ? (
@@ -522,11 +532,11 @@ export default function SellerPage() {
                         }}
                         role="presentation"
                       >
-                        <Plus size={18} strokeWidth={2.5} />
+                        <Plus size={14} strokeWidth={2.5} />
                       </div>
                     </div>
                   </div>
-                </article>
+                </motion.article>
               )
             })}
         </div>
@@ -595,40 +605,49 @@ export default function SellerPage() {
             </div>
           ) : (
             <div className="pos-cart-list">
-              {cart.map(item => (
-                <div key={item.id} className="pos-cart-item-modern">
-                  <div className="pos-cart-item-img-box">
-                    {item.imageUrl ? (
-                      <img src={item.imageUrl} alt="" className="pos-cart-item-img" />
-                    ) : (
-                      <div className="item-placeholder">{item.name[0]}</div>
-                    )}
-                  </div>
-                  <div className="pos-cart-item-info">
-                    <strong>{item.name}</strong>
-                    <span className="info-price">{formatErpUsdAllowZero(item.unitPrice)}</span>
-                  </div>
-                  <div className="pos-cart-item-actions">
-                    <button
-                      type="button"
-                      className="qty-btn"
-                      onClick={() => updateQty(item.id, -1)}
-                      disabled={Boolean(lineBusy[item.id])}
-                    >
-                      <Minus size={14} />
-                    </button>
-                    <span className="qty-val">{item.qty}</span>
-                    <button
-                      type="button"
-                      className="qty-btn"
-                      onClick={() => updateQty(item.id, 1)}
-                      disabled={Boolean(lineBusy[item.id])}
-                    >
-                      <Plus size={14} />
-                    </button>
-                  </div>
-                </div>
-              ))}
+              <AnimatePresence mode="popLayout">
+                {cart.map(item => (
+                  <motion.div 
+                    key={item.id} 
+                    layout
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20, scale: 0.95 }}
+                    className="pos-cart-item-modern"
+                  >
+                    <div className="pos-cart-item-img-box">
+                      {item.imageUrl ? (
+                        <img src={item.imageUrl} alt="" className="pos-cart-item-img" />
+                      ) : (
+                        <div className="item-placeholder">{item.name[0]}</div>
+                      )}
+                    </div>
+                    <div className="pos-cart-item-info">
+                      <strong>{item.name}</strong>
+                      <span className="info-price">{formatErpUsdAllowZero(item.unitPrice)}</span>
+                    </div>
+                    <div className="pos-cart-item-actions">
+                      <button
+                        type="button"
+                        className="qty-btn"
+                        onClick={() => updateQty(item.id, -1)}
+                        disabled={Boolean(lineBusy[item.id])}
+                      >
+                        <Minus size={14} />
+                      </button>
+                      <span className="qty-val">{item.qty}</span>
+                      <button
+                        type="button"
+                        className="qty-btn"
+                        onClick={() => updateQty(item.id, 1)}
+                        disabled={Boolean(lineBusy[item.id])}
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
           )}
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import ErpShell from '@/components/ErpShell'
+import HorizontalBarChart from '@/components/HorizontalBarChart'
 import { formatErpUsdAllowZero } from '@/lib/formatErpUsd'
 import { fetchSalesMonthlyAnalytics } from '@/services/erpSalesOrders'
 import { 
@@ -109,82 +110,25 @@ export default function AnalitikaPage() {
 
       {error && <div className="erp-banner err" style={{ marginBottom: '1.5rem' }}>{error}</div>}
 
-      <div className="erpf-content-grid" style={{ gridTemplateColumns: '1fr', gap: '2rem' }}>
-        <section className="erpf-table-card">
-          <div className="erpf-table-head">
-            <div className="erpf-table-title">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <PieChart size={18} style={{ color: 'var(--primary)' }} />
-                <h3>Kategoriya bo'yicha sotuv</h3>
-              </div>
-              <p>Mahsulot turlari kesimida umumiy savdo</p>
-            </div>
-          </div>
-          <div className="erpf-table-scroll">
-            <table className="erpf-table">
-              <thead>
-                <tr>
-                  <th>Kategoriya</th>
-                  <th>Miqdor</th>
-                  <th>Jami (USD)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={3} style={{ textAlign: 'center', padding: '4rem' }}><div className="erp-spinner" /></td></tr>
-                ) : data.categories.length === 0 ? (
-                  <tr><td colSpan={3} style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)' }}>Ma'lumot topilmadi</td></tr>
-                ) : (
-                  data.categories.map((row) => (
-                    <tr key={row.category_name}>
-                      <td style={{ color: 'var(--text)', fontWeight: '500' }}>{row.category_name}</td>
-                      <td><span className="erpf-badge">{row.pieces} ta</span></td>
-                      <td style={{ fontWeight: '600', color: 'var(--primary)' }}>{formatErpUsdAllowZero(row.total_usd)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <section className="erpf-table-card">
-          <div className="erpf-table-head">
-            <div className="erpf-table-title">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Package size={18} style={{ color: 'var(--primary)' }} />
-                <h3>Mahsulot bo'yicha sotuv</h3>
-              </div>
-              <p>Top sotilayotgan mahsulotlar ro'yxati</p>
-            </div>
-          </div>
-          <div className="erpf-table-scroll">
-            <table className="erpf-table">
-              <thead>
-                <tr>
-                  <th>Mahsulot</th>
-                  <th>Miqdor</th>
-                  <th>Jami (USD)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={3} style={{ textAlign: 'center', padding: '4rem' }}><div className="erp-spinner" /></td></tr>
-                ) : (data.products || []).length === 0 ? (
-                  <tr><td colSpan={3} style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)' }}>Ma'lumot topilmadi</td></tr>
-                ) : (
-                  data.products.map((row) => (
-                    <tr key={row.product_name}>
-                      <td style={{ color: 'var(--text)', fontWeight: '500' }}>{row.product_name}</td>
-                      <td><span className="erpf-badge">{row.pieces} ta</span></td>
-                      <td style={{ fontWeight: '600', color: 'var(--primary)' }}>{formatErpUsdAllowZero(row.total_usd)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
+      <div className="erpf-content-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem' }}>
+        {loading ? (
+          <div className="erp-spinner" style={{ margin: '4rem auto', gridColumn: '1/-1' }} />
+        ) : (
+          <>
+            <HorizontalBarChart 
+              title="Kategoriya bo'yicha sotuv" 
+              data={data.categories.map(c => ({ label: c.category_name, value: c.total_usd }))} 
+            />
+            
+            <HorizontalBarChart 
+              title="Top mahsulotlar" 
+              data={(data.products || []).slice(0, 5).map(p => ({ label: p.product_name, value: p.total_usd }))} 
+            />
+          </>
+        )}
+      </div>
+      
+      <div className="erpf-content-grid" style={{ gridTemplateColumns: '1fr', gap: '2rem', marginTop: '2rem' }}>
 
         <section className="erpf-table-card">
           <div className="erpf-table-head">
