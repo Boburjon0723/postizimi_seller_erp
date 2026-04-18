@@ -3,16 +3,7 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { defaultPathForRole, resolveNuurRole } from '@/lib/authRole'
 import { AuthContext } from '@/context/auth-context'
 
-/** getSession() uchun qisqa timeout brauzer lock bilan to‘qnashadi — faqat juda uzoq kutishga chek */
-const SESSION_HARD_TIMEOUT_MS = 45000
 const APP_ALLOWED_ROLES = new Set(['seller', 'erp', 'admin'])
-
-function withTimeout(promise, ms, message) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
-  ])
-}
 
 export function AuthProvider({ children }) {
   const configured = isSupabaseConfigured()
@@ -48,73 +39,39 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     if (!configured) {
+      setLoading(false)
       return
     }
 
     let cancelled = false
 
-    ;(async () => {
-      try {
-        let s = null
-        try {
-          const out = await withTimeout(
-            supabase.auth.getSession(),
-            SESSION_HARD_TIMEOUT_MS,
-            'Sessiya tekshiruv javobi kechikdi'
-          )
-          s = out?.data?.session ?? null
-        } catch (firstErr) {
-          const msg = String(firstErr?.message || firstErr || '')
-          const lockish =
-            /NavigatorLock|lock:sb-|stole it|LockAcquire/i.test(msg) ||
-            firstErr?.name === 'NavigatorLockAcquireTimeoutError'
-          if (lockish) {
-            await new Promise((r) => setTimeout(r, 250))
-            const { data } = await supabase.auth.getSession()
-            s = data?.session ?? null
-          } else {
-            throw firstErr
-          }
-        }
-        if (cancelled) return
-        setSession(s)
-        setUser(s?.user ?? null)
-        if (s?.user) {
-          const r = await resolveNuurRole(s.user)
-          applyResolvedRole(r)
-        } else {
-          setRole(null)
-        }
-        setLoading(false)
-      } catch (err) {
-        if (cancelled) return
-        setSession(null)
-        setUser(null)
-        setRole(null)
-        setAuthError(err?.message || String(err))
-        setLoading(false)
-      }
-    })()
-
+    /**
+     * Sessiyani faqat onAuthStateChange orqali tiklash (Supabase tavsiyasi).
+     * Avvalgi getSession()+catch() yozuvlari lock/timeoutda xato bersa sessiyani o‘chirib yuborardi,
+     * keyin INITIAL_SESSION kelganda tiklangan bo‘lsa ham catch yana null qilardi — har refreshda login.
+     */
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, s) => {
+      if (cancelled) return
       setAuthError(null)
       setSession(s)
       setUser(s?.user ?? null)
       if (s?.user) {
-        // TOKEN_REFRESHED: profilni qayta o‘qimaslik — tarmoq/timeout vaqtincha `seller`ga tushib
-        // ErpHome /sotuvchiga yo‘naltirishining oldini oladi.
         if (event === 'TOKEN_REFRESHED') {
-          if (!cancelled) setLoading(false)
+          setLoading(false)
           return
         }
-        const r = await resolveNuurRole(s.user)
-        applyResolvedRole(r)
+        try {
+          const r = await resolveNuurRole(s.user)
+          applyResolvedRole(r)
+        } catch {
+          applyResolvedRole(null)
+        }
       } else {
         setRole(null)
       }
-      if (!cancelled) setLoading(false)
+      setLoading(false)
     })
 
     return () => {

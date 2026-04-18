@@ -10,6 +10,7 @@ import SellerPage from '@/pages/SellerPage'
 import SellerOrdersPage from '@/pages/SellerOrdersPage'
 import AccessDeniedPage from '@/pages/AccessDeniedPage'
 import WarehousePage from '@/pages/WarehousePage'
+import WarehousePhysicalPage from '@/pages/WarehousePhysicalPage'
 import KeltirilganPage from '@/pages/KeltirilganPage'
 import KeltirilganMonthlyPage from '@/pages/KeltirilganMonthlyPage'
 import AnalitikaPage from '@/pages/AnalitikaPage'
@@ -41,6 +42,14 @@ function AppRoutes() {
           element={
             <RequireErpRole>
               <WarehousePage />
+            </RequireErpRole>
+          }
+        />
+        <Route
+          path="ombor/fizik"
+          element={
+            <RequireErpRole>
+              <WarehousePhysicalPage />
             </RequireErpRole>
           }
         />

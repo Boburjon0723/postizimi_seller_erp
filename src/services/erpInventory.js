@@ -442,12 +442,15 @@ export function getProductUnitPrice(product) {
   return 0
 }
 
-/** Ombor qiymati (USD) — narx o‘zgarishidan mustaqil. */
+/**
+ * Do‘kon omboridagi mahsulot qiymati (USD): qoldiq × joriy katalog narxi.
+ * `erp_store_inventory.stock_value_usd` ishlatilmaydi — u odatda kirim/tan narx bo‘yicha;
+ * sahifadagi «Jami qiymat» va narx tahriri esa joriy `product_erp_pricing` bilan mos bo‘lsin.
+ */
 export function getProductStockValueUsd(product) {
-  const v = Number(product?.stock_value_usd)
-  if (Number.isFinite(v) && v >= 0) return v
   const qty = Math.max(0, Number(product?.stock) || 0)
-  return qty * getProductUnitPrice(product)
+  const unit = getProductUnitPrice(product)
+  return Math.round(qty * unit * 100) / 100
 }
 
 function trimUrl(value) {

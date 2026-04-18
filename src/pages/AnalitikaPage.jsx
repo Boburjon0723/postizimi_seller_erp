@@ -3,6 +3,7 @@ import ErpShell from '@/components/ErpShell'
 import HorizontalBarChart from '@/components/HorizontalBarChart'
 import { formatErpUsdAllowZero } from '@/lib/formatErpUsd'
 import { fetchSalesMonthlyAnalytics } from '@/services/erpSalesOrders'
+import { fetchProductsForErp, getProductDisplayName } from '@/services/erpInventory'
 import { 
   BarChart3, 
   Calendar, 
@@ -31,13 +32,26 @@ export default function AnalitikaPage() {
     customers: [],
     products: [],
   })
+  const [inventory, setInventory] = useState([])
+
+  const stockByProductId = useMemo(() => {
+    const m = new Map()
+    for (const p of inventory) {
+      m.set(String(p.id), Math.max(0, Math.floor(Number(p.stock) || 0)))
+    }
+    return m
+  }, [inventory])
 
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const rows = await fetchSalesMonthlyAnalytics(monthKey)
+      const [rows, inv] = await Promise.all([
+        fetchSalesMonthlyAnalytics(monthKey),
+        fetchProductsForErp().catch(() => []),
+      ])
       setData(rows)
+      setInventory(Array.isArray(inv) ? inv : [])
     } catch (e) {
       setError(e?.message || String(e))
     } finally {
@@ -55,6 +69,24 @@ export default function AnalitikaPage() {
     if (Number.isNaN(d.getTime())) return monthKey
     return d.toLocaleDateString('uz-UZ', { year: 'numeric', month: 'long' })
   }, [monthKey])
+
+  const resolveStockNow = useCallback(
+    (row) => {
+      const pid = row?.product_id != null ? String(row.product_id).trim() : ''
+      if (pid) {
+        const v = stockByProductId.get(pid)
+        return v != null ? v : null
+      }
+      const nm = String(row?.product_name || '').trim().toLowerCase()
+      if (!nm) return null
+      for (const p of inventory) {
+        const dn = getProductDisplayName(p).trim().toLowerCase()
+        if (dn === nm) return Math.max(0, Math.floor(Number(p.stock) || 0))
+      }
+      return null
+    },
+    [stockByProductId, inventory]
+  )
 
   return (
     <ErpShell>
@@ -129,6 +161,64 @@ export default function AnalitikaPage() {
       </div>
       
       <div className="erpf-content-grid" style={{ gridTemplateColumns: '1fr', gap: '2rem', marginTop: '2rem' }}>
+        <section className="erpf-table-card">
+          <div className="erpf-table-head">
+            <div className="erpf-table-title">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Package size={18} style={{ color: 'var(--primary)' }} />
+                <h3>Mahsulot bo‘yicha: oy savdosi va ombor</h3>
+              </div>
+              <p>
+                Shu oyda nechta sotilgani va hozirgi ombor qoldig‘i — sotuvlar allaqachon zaxiradan yechilgani
+                hisobiga mos keladi (omborda yo‘q mahsulot sotilmaydi).
+              </p>
+            </div>
+          </div>
+          <div className="erpf-table-scroll">
+            <table className="erpf-table">
+              <thead>
+                <tr>
+                  <th>Mahsulot</th>
+                  <th style={{ textAlign: 'right' }}>Shu oy sotilgan</th>
+                  <th style={{ textAlign: 'right' }}>Hozirgi omborda</th>
+                  <th style={{ textAlign: 'right' }}>Oy savdosi (USD)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={4} style={{ textAlign: 'center', padding: '4rem' }}>
+                      <div className="erp-spinner" />
+                    </td>
+                  </tr>
+                ) : !data.products?.length ? (
+                  <tr>
+                    <td colSpan={4} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                      Bu oy uchun mahsulot bo‘yicha maʼlumot yo‘q.
+                    </td>
+                  </tr>
+                ) : (
+                  data.products.map((row, i) => {
+                    const sold = Math.max(0, Math.floor(Number(row.pieces) || 0))
+                    const stockNow = resolveStockNow(row)
+                    return (
+                      <tr key={row.product_id || `${row.product_name}-${i}`}>
+                        <td style={{ fontWeight: 600, color: 'var(--text)' }}>{row.product_name}</td>
+                        <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{sold} dona</td>
+                        <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                          {stockNow != null ? `${stockNow} dona` : '—'}
+                        </td>
+                        <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--primary)' }}>
+                          {formatErpUsdAllowZero(row.total_usd)}
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
 
         <section className="erpf-table-card">
           <div className="erpf-table-head">

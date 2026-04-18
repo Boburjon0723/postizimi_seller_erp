@@ -10,12 +10,14 @@ import {
   LogOut, 
   Bell,
   Search,
-  User
+  User,
+  Warehouse,
 } from 'lucide-react'
 
 const NAV = [
   { to: '/', label: 'Boshqaruv paneli', icon: <LayoutDashboard size={20} />, end: true },
   { to: '/ombor', label: 'Ombor', icon: <Package size={20} />, end: true },
+  { to: '/ombor/fizik', label: 'Fizik ombor', icon: <Warehouse size={20} />, end: true },
   { to: '/keltirilgan', label: 'Keltirilgan', icon: <Truck size={20} />, end: true },
   { to: '/keltirilgan/hisobot', label: 'Keltirilgan (oylar)', icon: <Calendar size={20} />, end: true },
   { to: '/analitika', label: 'Tahliliy maʼlumotlar', icon: <BarChart3 size={20} />, end: true },

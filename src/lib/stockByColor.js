@@ -20,7 +20,17 @@ export function listProductColors(p) {
 }
 
 export function parseStockByColor(p) {
-  const raw = p?.stock_by_color
+  let raw = p?.stock_by_color
+  if (raw == null) return {}
+  if (typeof raw === 'string') {
+    const s = raw.trim()
+    if (!s) return {}
+    try {
+      raw = JSON.parse(s)
+    } catch {
+      return {}
+    }
+  }
   if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
     const o = {}
     for (const [k, v] of Object.entries(raw)) {
@@ -74,6 +84,21 @@ export function buildStockByColorMap(product) {
 
 export function productHasColorVariants(p) {
   return listProductColors(p).length > 0
+}
+
+/**
+ * Rang kartochkalari tartibi: avvalo mahsulot katalogidagi ranglar, keyin `stock_by_color`dagi
+ * qo‘shimcha kalitlar (nom mos kelmasa ham ko‘rinadi — aks holda zaxira 5, ranglar 0 ko‘rinishi bo‘lardi).
+ */
+export function orderedColorKeysForStock(product, colorMap) {
+  const catalog = listProductColors(product)
+  const m = colorMap && typeof colorMap === 'object' ? colorMap : {}
+  const inMap = Object.keys(m)
+  const rest = inMap.filter(
+    (k) => !catalog.some((c) => normalizeOrderItemColorKey(c) === normalizeOrderItemColorKey(k))
+  )
+  rest.sort((a, b) => a.localeCompare(b, 'uz', { sensitivity: 'base' }))
+  return [...catalog, ...rest]
 }
 
 export function resolveColorBucketKey(product, orderColorRaw) {

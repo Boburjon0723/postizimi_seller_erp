@@ -1,4 +1,4 @@
-import { buildGroupedInboundRows } from '@/lib/inboundCrmTable'
+import { buildGroupedInboundRows, computeInboundTotalsFromRow } from '@/lib/inboundCrmTable'
 import { supabase } from '@/lib/supabase'
 import { fetchProductMapByIds } from '@/services/erpInventory'
 import { applyErpStoreInboundFromItems } from '@/services/erpStoreInboundApply'
@@ -55,6 +55,34 @@ export async function fetchAcceptedInboundReport({ limit = 500 } = {}) {
 
   if (error) throw error
   return data || []
+}
+
+/**
+ * Barcha qabul qilingan CRM kirimlarining jami summasi (USD; `accepted_total_uzs` maydoni).
+ * Yozuvlarda jami bo‘lmasa, `items` dan qayta hisoblanadi (oylik hisobot bilan bir xil).
+ */
+export async function fetchAcceptedInboundUsdGrandTotal() {
+  const raw = await fetchAcceptedInboundReport({ limit: 10000 })
+  const needs = raw.filter(
+    (r) => r.accepted_total_uzs == null || r.accepted_total_pieces == null
+  )
+  const pidSet = new Set()
+  for (const r of needs) {
+    for (const it of Array.isArray(r.items) ? r.items : []) {
+      if (it?.product_id) pidSet.add(String(it.product_id))
+    }
+  }
+  const map = pidSet.size ? await fetchProductMapByIds([...pidSet]) : new Map()
+  let total = 0
+  for (const r of raw) {
+    let usd = Number(r.accepted_total_uzs)
+    if (!Number.isFinite(usd)) {
+      const { money } = computeInboundTotalsFromRow(r, map)
+      usd = Number(money) || 0
+    }
+    total += usd
+  }
+  return Math.round(total * 100) / 100
 }
 
 /**

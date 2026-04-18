@@ -1,34 +1,34 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import ErpShell from '@/components/ErpShell'
 import { formatErpUsdAllowZero } from '@/lib/formatErpUsd'
 import {
   buildStockByColorMap,
-  listProductColors,
+  orderedColorKeysForStock,
   productHasColorVariants,
 } from '@/lib/stockByColor'
+import { fetchAcceptedInboundUsdGrandTotal } from '@/services/erpInboundRequests'
 import {
   fetchProductsForErp,
   getProductDisplayCategory,
-  getProductDisplayDescription,
   getProductDisplayName,
   getProductImageUrl,
   getProductStockValueUsd,
   getProductUnitPrice,
   updateErpProductUnitPrice,
 } from '@/services/erpInventory'
-import { 
-  RefreshCw, 
-  Plus, 
-  Package, 
-  AlertTriangle, 
-  Clock, 
+import {
+  RefreshCw,
+  Plus,
+  AlertTriangle,
+  Clock,
   DollarSign,
+  Save,
+  Box,
   ChevronDown,
   ChevronRight,
-  Save,
   Tag,
-  Search,
-  Box
+  BadgeCheck,
 } from 'lucide-react'
 
 function stockStatus(stock) {
@@ -47,6 +47,7 @@ export default function WarehousePage() {
   const [expandedById, setExpandedById] = useState({})
   const [priceDraftById, setPriceDraftById] = useState({})
   const [priceSavingId, setPriceSavingId] = useState(null)
+  const [acceptedOrdersUsd, setAcceptedOrdersUsd] = useState(null)
 
   const load = useCallback(async () => {
     setError(null)
@@ -54,6 +55,12 @@ export default function WarehousePage() {
     try {
       const rows = await fetchProductsForErp()
       setProducts(rows)
+      try {
+        const u = await fetchAcceptedInboundUsdGrandTotal()
+        setAcceptedOrdersUsd(Number.isFinite(u) ? u : null)
+      } catch {
+        setAcceptedOrdersUsd(null)
+      }
     } catch (e) {
       setError(e?.message || String(e))
     } finally {
@@ -162,8 +169,13 @@ export default function WarehousePage() {
         <div>
           <h1 className="erpf-page-title">Ombor Nazorati 📦</h1>
           <p className="erpf-page-sub">Hozirda {stat.total} turdagi mahsulot mavjud.</p>
+          <p className="wh-phys-cross" style={{ marginTop: '0.5rem' }}>
+            <Link to="/ombor/fizik" className="wh-phys-link">
+              Fizik ombor (zaxira &gt; 0, kategoriya jamlari)
+            </Link>
+          </p>
         </div>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           <button type="button" className="erpf-icon-btn" onClick={load} title="Yangilash">
             <RefreshCw size={20} className={loading ? 'spin' : ''} />
           </button>
@@ -176,14 +188,19 @@ export default function WarehousePage() {
 
       <div className="erpf-wh-stats">
         <article className="erpf-wh-stat">
-          <div className="erpf-wh-ico"><Box size={22} /></div>
+          <div className="erpf-wh-ico">
+            <Box size={22} />
+          </div>
           <div>
             <strong>{stat.total}</strong>
             <small>Jami turlar</small>
           </div>
         </article>
         <article className="erpf-wh-stat">
-          <div className="erpf-wh-ico" style={{ color: 'var(--danger)', background: 'rgba(239, 68, 68, 0.1)' }}>
+          <div
+            className="erpf-wh-ico"
+            style={{ color: 'var(--danger)', background: 'rgba(239, 68, 68, 0.1)' }}
+          >
             <AlertTriangle size={22} />
           </div>
           <div>
@@ -192,7 +209,10 @@ export default function WarehousePage() {
           </div>
         </article>
         <article className="erpf-wh-stat">
-          <div className="erpf-wh-ico" style={{ color: 'var(--warning)', background: 'rgba(245, 158, 11, 0.1)' }}>
+          <div
+            className="erpf-wh-ico"
+            style={{ color: 'var(--warning)', background: 'rgba(245, 158, 11, 0.1)' }}
+          >
             <Clock size={22} />
           </div>
           <div>
@@ -201,7 +221,10 @@ export default function WarehousePage() {
           </div>
         </article>
         <article className="erpf-wh-stat">
-          <div className="erpf-wh-ico" style={{ color: 'var(--success)', background: 'rgba(16, 185, 129, 0.1)' }}>
+          <div
+            className="erpf-wh-ico"
+            style={{ color: 'var(--success)', background: 'rgba(16, 185, 129, 0.1)' }}
+          >
             <DollarSign size={22} />
           </div>
           <div>
@@ -209,11 +232,25 @@ export default function WarehousePage() {
             <small>Jami qiymat (USD)</small>
           </div>
         </article>
+        <article className="erpf-wh-stat">
+          <div
+            className="erpf-wh-ico"
+            style={{ color: '#2563eb', background: 'rgba(37, 99, 235, 0.1)' }}
+          >
+            <BadgeCheck size={22} />
+          </div>
+          <div>
+            <strong>
+              {acceptedOrdersUsd == null ? '—' : formatErpUsdAllowZero(acceptedOrdersUsd)}
+            </strong>
+            <small>Tasdiqlangan buyurtmalar (CRM), jami USD</small>
+          </div>
+        </article>
       </div>
 
-      <div className="erpf-table-card">
-        <div className="erpf-table-head" style={{ padding: '1rem 1.5rem' }}>
-          <div className="erpf-chip-group">
+      <div className="erpf-table-card erpf-wh-table-wrap">
+        <div className="erpf-table-head erpf-wh-table-toolbar">
+          <div className="erpf-chip-group erpf-chip-group--scroll">
             <button
               type="button"
               className={category === 'all' ? 'active' : ''}
@@ -232,43 +269,47 @@ export default function WarehousePage() {
               </button>
             ))}
           </div>
-          <div style={{ position: 'relative' }}>
-            <select
-              className="erp-input"
-              style={{ width: '200px', fontSize: '0.875rem', paddingRight: '2.5rem' }}
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-            >
-              <option value="new">Eng yangi</option>
-              <option value="name">Nomi bo'yicha</option>
-              <option value="stock">Miqdori bo'yicha</option>
-            </select>
-          </div>
+          <select
+            className="erp-input erpf-wh-sort"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+          >
+            <option value="new">Eng yangi</option>
+            <option value="name">Nomi bo'yicha</option>
+            <option value="stock">Miqdori bo'yicha</option>
+          </select>
         </div>
 
-        {error && <div className="erp-banner err" style={{ margin: '1rem' }}>{error}</div>}
+        {error && <div className="erp-banner err erpf-wh-banner">{error}</div>}
 
         <div className="erpf-table-scroll">
-          <table className="erpf-table">
+          <table className="erpf-table erpf-table--warehouse">
             <thead>
               <tr>
                 <th>Mahsulot</th>
                 <th>SKU / O'lcham</th>
                 <th>Kategoriya</th>
                 <th>Miqdor</th>
-                <th style={{ width: '260px' }}>Narx (USD)</th>
+                <th style={{ width: '240px' }}>Narx (USD)</th>
                 <th>Holat</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={6} style={{ textAlign: 'center', padding: '4rem' }}><div className="erp-spinner" /></td></tr>
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '3rem' }}>
+                    <div className="erp-spinner" />
+                  </td>
+                </tr>
               ) : filteredRows.length === 0 ? (
-                <tr><td colSpan={6} style={{ textAlign: 'center', padding: '4rem' }}><p style={{ color: 'var(--text-muted)' }}>Mahsulotlar topilmadi.</p></td></tr>
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '3rem' }}>
+                    <p style={{ color: 'var(--text-muted)', margin: 0 }}>Mahsulotlar topilmadi.</p>
+                  </td>
+                </tr>
               ) : (
                 filteredRows.map((r) => {
                   const name = getProductDisplayName(r)
-                  const desc = getProductDisplayDescription(r)
                   const qty = Math.max(0, Number(r.stock) || 0)
                   const status = stockStatus(qty)
                   const price = getProductUnitPrice(r)
@@ -277,8 +318,8 @@ export default function WarehousePage() {
                   const showImg = Boolean(thumbUrl) && !brokenImgIds.has(rid)
                   const expanded = Boolean(expandedById[rid])
                   const hasColorVariants = productHasColorVariants(r)
-                  const colorNames = listProductColors(r)
                   const colorMap = hasColorVariants ? buildStockByColorMap(r) : {}
+                  const colorNames = hasColorVariants ? orderedColorKeysForStock(r, colorMap) : []
                   const priceDraft = getPriceDraftValue(r)
                   const saving = priceSavingId === rid
 
@@ -292,23 +333,24 @@ export default function WarehousePage() {
                             onClick={() => toggleExpand(r.id)}
                             aria-expanded={expanded}
                           >
-                            <div className="erpf-product-cell">
+                            <div className="erpf-product-cell erpf-product-cell--compact">
                               {showImg ? (
                                 <img
-                                  className="erpf-wh-thumb"
+                                  className="erpf-wh-thumb erpf-wh-thumb--sm"
                                   src={thumbUrl}
                                   alt=""
                                   loading="lazy"
                                   onError={() => setBrokenImgIds((prev) => new Set(prev).add(rid))}
                                 />
                               ) : (
-                                <div className="erpf-wh-thumb-placeholder">
-                                  {name[0].toUpperCase()}
+                                <div className="erpf-wh-thumb-placeholder erpf-wh-thumb--sm">
+                                  {name[0]?.toUpperCase() || '?'}
                                 </div>
                               )}
                               <div className="erpf-product-text">
-                                <span style={{ fontWeight: '600', color: 'var(--text)' }}>{name}</span>
-                                {desc && <span className="erpf-table-subtext">{desc}</span>}
+                                <span className="erpf-product-name" title={name}>
+                                  {name}
+                                </span>
                                 <span className="erpf-open-hint">
                                   {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                                   {expanded ? 'Ranglarni yopish' : 'Ranglar kesimi'}
@@ -317,10 +359,16 @@ export default function WarehousePage() {
                             </div>
                           </button>
                         </td>
-                        <td><span className="erpf-badge">{r.size || 'Standard'}</span></td>
-                        <td><div className="erpf-cell-tag">{getProductDisplayCategory(r)}</div></td>
+                        <td>
+                          <span className="erpf-badge">{r.size || 'Standard'}</span>
+                        </td>
+                        <td>
+                          <div className="erpf-cell-tag erpf-cell-tag--ellipsis">
+                            {getProductDisplayCategory(r)}
+                          </div>
+                        </td>
                         <td className={qty <= 5 ? 'qty-warn' : ''}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <div className="erpf-qty-cell">
                             <strong>{qty}</strong>
                             <small>dona</small>
                           </div>
@@ -343,12 +391,11 @@ export default function WarehousePage() {
                               className={`erpf-btn-save ${saving ? 'loading' : ''}`}
                               disabled={saving}
                               onClick={() => savePrice(r)}
+                              title="Saqlash"
                             >
                               <Save size={16} />
                             </button>
-                            <div className="erpf-current-price">
-                              {formatErpUsdAllowZero(price)}
-                            </div>
+                            <div className="erpf-current-price">{formatErpUsdAllowZero(price)}</div>
                           </div>
                         </td>
                         <td>
@@ -396,4 +443,3 @@ export default function WarehousePage() {
     </ErpShell>
   )
 }
-

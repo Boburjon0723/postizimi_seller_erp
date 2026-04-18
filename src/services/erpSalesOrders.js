@@ -282,11 +282,20 @@ export async function fetchSalesMonthlyAnalytics(monthKey) {
       k.total_usd += line
       byCategory.set(cat, k)
 
-      // By Product
-      const p = byProduct.get(prodName) || { product_name: prodName, pieces: 0, total_usd: 0 }
+      // By Product (id bo‘yicha — ombor bilan bog‘lash uchun)
+      const pid = String(item.product_id || '').trim()
+      const prodKey = pid ? `id:${pid}` : `name:${prodName}`
+      const p =
+        byProduct.get(prodKey) || {
+          product_id: pid || null,
+          product_name: prodName,
+          pieces: 0,
+          total_usd: 0,
+        }
+      if (!p.product_id && pid) p.product_id = pid
       p.pieces += qty
       p.total_usd += line
-      byProduct.set(prodName, p)
+      byProduct.set(prodKey, p)
 
       c.pieces += qty
       c.total_usd += line

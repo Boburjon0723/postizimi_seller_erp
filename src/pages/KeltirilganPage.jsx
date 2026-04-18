@@ -26,8 +26,17 @@ import {
   AlertTriangle,
   ChevronRight,
   User,
-  Hash
+  Hash,
+  Printer,
 } from 'lucide-react'
+
+function escHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
 
 function formatDt(iso) {
   if (!iso) return '—'
@@ -52,6 +61,7 @@ export default function KeltirilganPage() {
   const [error, setError] = useState(null)
   const [actingId, setActingId] = useState(null)
   const [repairingId, setRepairingId] = useState(null)
+  const [printingId, setPrintingId] = useState(null)
 
   const [detailRow, setDetailRow] = useState(null)
   const [detailGroups, setDetailGroups] = useState([])
@@ -189,6 +199,104 @@ export default function KeltirilganPage() {
     return () => window.removeEventListener('keydown', onKey)
   }, [detailRow, closeDetail])
 
+  const buildInboundPrintHtml = useCallback((r, inboundTable) => {
+    const orderNo = r.order_number_snapshot || String(r.order_id || '').slice(0, 8)
+    const customer = r.customer_name_snapshot || '—'
+    const sentAt = formatDt(r.created_at)
+    let body = ''
+    for (const row of inboundTable.rows) {
+      if (row.type === 'cat-header') {
+        body += `<tr class="cat-head"><td colspan="9">${escHtml(`Kategoriya: ${row.label}`)}</td></tr>`
+        continue
+      }
+      if (row.type === 'cat-subtotal') {
+        body += `<tr class="cat-total"><td colspan="5" style="text-align:right;font-weight:600">Kategoriya jami</td><td>${escHtml(String(row.pieces))}</td><td>—</td><td style="text-align:right;font-weight:600">${formatInboundUsdAllowZero(row.money ?? 0)}</td><td></td></tr>`
+        continue
+      }
+      const g = row.group
+      const imgUrl = getProductImageUrl(g.product || {})
+      const imgCell = imgUrl
+        ? `<td class="cell-img"><img src="${escHtml(imgUrl)}" alt="" /></td>`
+        : `<td class="cell-img"><div class="img-ph">—</div></td>`
+      const rangHtml = g.colorPairs.map(([label]) => `<div class="sl">${escHtml(label)}</div>`).join('')
+      const qtyHtml = g.colorPairs.map(([, q]) => `<div class="sl">${escHtml(String(q))}</div>`).join('')
+      const unitStr = g.unitPrice != null ? formatInboundUsdAllowZero(g.unitPrice) : '—'
+      const lineStr = g.lineMoney != null ? formatInboundUsdAllowZero(g.lineMoney) : '—'
+      body += `<tr>
+        <td class="td-c">${row.displayIndex}</td>
+        ${imgCell}
+        <td class="td-k">${escHtml(g.sizeDisplay)}</td>
+        <td><div class="stack">${rangHtml}</div></td>
+        <td><div class="stack">${qtyHtml}</div></td>
+        <td class="td-c">${g.totalPieces}</td>
+        <td style="text-align:right">${unitStr}</td>
+        <td style="text-align:right;font-weight:600">${lineStr}</td>
+        <td></td>
+      </tr>`
+    }
+    body += `<tr class="grand"><td colspan="5" style="text-align:right;font-weight:700">Jami</td><td class="td-c">${inboundTable.totalPar}</td><td>—</td><td style="text-align:right;font-weight:700">${formatInboundUsdAllowZero(inboundTable.totalMoney ?? 0)}</td><td></td></tr>`
+
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Kirim ${escHtml(orderNo)}</title>
+<style>
+  body{font-family:system-ui,-apple-system,sans-serif;padding:28px;color:#0f172a;line-height:1.45;font-size:13px;}
+  h1{margin:0 0 6px;font-size:20px;}
+  .meta{color:#64748b;font-size:13px;margin-bottom:22px;}
+  table{width:100%;border-collapse:collapse;}
+  th,td{border:1px solid #cbd5e1;padding:8px 10px;vertical-align:middle;}
+  thead th{background:#fef3c7;font-weight:700;text-align:center;font-size:11px;text-transform:uppercase;}
+  .td-c{text-align:center;}
+  .td-k{font-weight:600;}
+  .stack .sl{padding:3px 0;border-top:1px solid #e2e8f0;}
+  .stack .sl:first-child{border-top:none;}
+  .cell-img{width:72px;text-align:center;}
+  .cell-img img{width:52px;height:52px;object-fit:cover;border-radius:6px;border:1px solid #e2e8f0;}
+  .img-ph{width:52px;height:52px;margin:0 auto;background:#f1f5f9;border-radius:6px;border:1px dashed #cbd5e1;display:flex;align-items:center;justify-content:center;font-size:12px;color:#94a3b8;}
+  tr.cat-head td{background:#dcfce7;font-weight:700;color:#14532d;}
+  tr.cat-total td{background:#e0f2fe;}
+  tr.grand td{background:#f8fafc;}
+</style></head><body>
+  <h1>Kirim tekshiruvi — № ${escHtml(orderNo)}</h1>
+  <div class="meta">Mijoz: <strong>${escHtml(customer)}</strong> · Yuborilgan: ${escHtml(sentAt)}</div>
+  <table>
+    <thead><tr>
+      <th>#</th><th>Rasm</th><th>Kod</th><th>Rang</th><th>Miqdor</th><th>Jami par</th><th>1 dona narxi</th><th>Qator summasi</th><th>Izoh</th>
+    </tr></thead>
+    <tbody>${body}</tbody>
+  </table>
+  <script>window.addEventListener('load',function(){setTimeout(function(){window.print()},280)})</script>
+</body></html>`
+  }, [])
+
+  const printPendingInbound = useCallback(
+    async (r) => {
+      const items = Array.isArray(r.items) ? r.items : []
+      if (!items.length) {
+        window.alert('Chop etish uchun qatorlar yo‘q.')
+        return
+      }
+      setPrintingId(r.id)
+      try {
+        const map = await fetchProductMapByIds(items.map((i) => i.product_id))
+        const groups = buildGroupedInboundRows(items, map)
+        const inboundTable = flattenInboundTableRows(groups, { showPrices: true })
+        const html = buildInboundPrintHtml(r, inboundTable)
+        const w = window.open('', '_blank', 'width=1000,height=760')
+        if (!w) {
+          window.alert('Yangi oyna ochilmadi — brauzer bloklovini tekshiring.')
+          return
+        }
+        w.document.open()
+        w.document.write(html)
+        w.document.close()
+      } catch (e) {
+        window.alert(e?.message || String(e))
+      } finally {
+        setPrintingId(null)
+      }
+    },
+    [buildInboundPrintHtml]
+  )
+
   const openDetail = useCallback(async (r) => {
     setDetailRow(r)
     setDetailLoading(true)
@@ -289,9 +397,6 @@ export default function KeltirilganPage() {
       <div className="erpf-page-head">
         <div>
           <h1 className="erpf-page-title">Keltirilgan / CRM jo‘natuvlari ✈️</h1>
-          <p className="erpf-page-sub">
-            CRM dan «ERP» tugmasi bilan yuborilgan buyurtmalar bu yerda tasdiqlanadi.
-          </p>
         </div>
         <button type="button" className="erpf-icon-btn" onClick={() => load()} title="Yangilash">
           <RefreshCw size={20} className={loading ? 'spin' : ''} />
@@ -386,9 +491,18 @@ export default function KeltirilganPage() {
                         <td><span className="erpf-badge">{items.length} qator</span></td>
                         <td><span style={{ fontSize: '0.875rem' }}>{formatDt(r.created_at)}</span></td>
                         <td style={{ textAlign: 'right' }}>
-                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                          <div className="erpf-inline-actions">
                             <button type="button" className="erpf-icon-btn" onClick={() => openDetail(r)} title="Ko'rish">
                               <Eye size={18} />
+                            </button>
+                            <button
+                              type="button"
+                              className="erpf-icon-btn"
+                              onClick={() => void printPendingInbound(r)}
+                              disabled={printingId === r.id || actingId === r.id}
+                              title="Chop etish"
+                            >
+                              <Printer size={18} />
                             </button>
                             <button type="button" className="erpf-icon-btn success" onClick={() => handleAccept(r.id)} disabled={actingId === r.id} title="Qabul qilish">
                               <Check size={18} />
@@ -438,7 +552,7 @@ export default function KeltirilganPage() {
                         </td>
                         <td><span style={{ fontSize: '0.8rem' }}>{formatDt(r.accepted_at)}</span></td>
                         <td style={{ textAlign: 'right' }}>
-                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                          <div className="erpf-inline-actions">
                              <button type="button" className="erpf-icon-btn" onClick={() => openDetail(r)}><Eye size={16} /></button>
                              <button type="button" className="erpf-icon-btn warning" onClick={() => handleRepair(r.id)} disabled={repairingId === r.id} title="Qayta qo'shish"><RotateCcw size={16} /></button>
                           </div>
